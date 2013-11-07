@@ -1,0 +1,787 @@
+﻿using System;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using Microsoft.Kinect;
+using System.Windows.Shapes;
+using System.Diagnostics;
+using System.Collections.Generic;
+
+namespace SkeletonTracking
+{
+    /// <summary>
+    /// MainWindow.xaml の相互作用ロジック
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        readonly int Bgr32BytesPerPixel = PixelFormats.Bgr32.BitsPerPixel / 8;
+        /*コード追加*********************/
+        LinkedList<Point> Points = new LinkedList<Point>();//X,Y座標のみ
+        LinkedList<SkeletonPoint> PPositions = new LinkedList<SkeletonPoint>();//キャプチャしたユーザの右手のposition
+        LinkedList<SkeletonPoint> Vertex = new LinkedList<SkeletonPoint>(); //オブジェクト認識した結果の頂点とか
+        /********************************/
+        /**onizawa**/
+        static int TOTAL_SAMPLE = 64;
+        static double CIRCLE_THRESHOLD = 0.8;//0.4; //円かどうか判断するための閾値
+        static double VERTEX_THRESHOLD = 0.5; //多角形の頂点を判定するための閾値
+        static int VERTEX_THRESHOLD_COUNT = 3; //多角形の頂点を判定する際、何点連続していたら閾値を超えたと判定するか
+        /**onizawaEND**/
+
+        public MainWindow()
+        {
+            try
+            {
+                InitializeComponent();
+
+                // Kinectが接続されているかどうかを確認する
+                if (KinectSensor.KinectSensors.Count == 0)
+                {
+                    throw new Exception("Kinectを接続してください");
+                }
+
+                // Kinectの動作を開始する
+                StartKinect(KinectSensor.KinectSensors[0]);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+                Close();
+            }
+        }
+
+        /// <summary>
+        /// Kinectの動作を開始する
+        /// </summary>
+        /// <param name="kinect"></param>
+        private void StartKinect(KinectSensor kinect)
+        {
+            // RGBカメラを有効にして、フレーム更新イベントを登録する
+            kinect.ColorStream.Enable();
+            kinect.ColorFrameReady +=
+              new EventHandler<ColorImageFrameReadyEventArgs>(kinect_ColorFrameReady);
+
+            // 距離カメラを有効にして、フレーム更新イベントを登録する
+            kinect.DepthStream.Enable();
+            kinect.DepthFrameReady +=
+              new EventHandler<DepthImageFrameReadyEventArgs>(kinect_DepthFrameReady);
+
+            // スケルトンを有効にして、フレーム更新イベントを登録する
+            kinect.SkeletonFrameReady +=
+              new EventHandler<SkeletonFrameReadyEventArgs>(kinect_SkeletonFrameReady);
+            kinect.SkeletonStream.Enable();
+
+            // Kinectの動作を開始する
+            kinect.Start();
+
+            // defaultモードとnearモードの切り替え
+            comboBoxRange.Items.Clear();
+            foreach (var range in Enum.GetValues(typeof(DepthRange)))
+            {
+                comboBoxRange.Items.Add(range.ToString());
+            }
+
+            comboBoxRange.SelectedIndex = 0;
+        }
+
+        /// <summary>
+        /// Kinectの動作を停止する
+        /// </summary>
+        /// <param name="kinect"></param>
+        private void StopKinect(KinectSensor kinect)
+        {
+            if (kinect != null)
+            {
+                if (kinect.IsRunning)
+                {
+                    // フレーム更新イベントを削除する
+                    kinect.ColorFrameReady -= kinect_ColorFrameReady;
+                    kinect.DepthFrameReady -= kinect_DepthFrameReady;
+                    kinect.SkeletonFrameReady -= kinect_SkeletonFrameReady;
+
+                    // Kinectの停止と、ネイティブリソースを解放する
+                    kinect.Stop();
+                    kinect.Dispose();
+
+                    imageRgb.Source = null;
+                    imageDepth.Source = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// RGBカメラのフレーム更新イベント
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        void kinect_ColorFrameReady(object sender, ColorImageFrameReadyEventArgs e)
+        {
+            try
+            {
+                // RGBカメラのフレームデータを取得する
+                using (ColorImageFrame colorFrame = e.OpenColorImageFrame())
+                {
+                    if (colorFrame != null)
+                    {
+                        // RGBカメラのピクセルデータを取得する
+                        byte[] colorPixel = new byte[colorFrame.PixelDataLength];
+                        colorFrame.CopyPixelDataTo(colorPixel);
+
+                        // ピクセルデータをビットマップに変換する
+                        imageRgb.Source = BitmapSource.Create(colorFrame.Width, colorFrame.Height, 96, 96,
+                            PixelFormats.Bgr32, null, colorPixel, colorFrame.Width * colorFrame.BytesPerPixel);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 距離カメラのフレーム更新イベント
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        void kinect_DepthFrameReady(object sender, DepthImageFrameReadyEventArgs e)
+        {
+            try
+            {
+                // センサーのインスタンスを取得する
+                KinectSensor kinect = sender as KinectSensor;
+                if (kinect == null)
+                {
+                    return;
+                }
+
+                // 距離カメラのフレームデータを取得する
+                using (DepthImageFrame depthFrame = e.OpenDepthImageFrame())
+                {
+                    if (depthFrame != null)
+                    {
+                        /**不要なので削除***********************************************************/
+                        // 距離データを画像化して表示
+                        //                        imageDepth.Source = BitmapSource.Create(depthFrame.Width, depthFrame.Height, 96, 96,
+                        //                            PixelFormats.Bgr32, null, ConvertDepthColor(kinect, depthFrame),
+                        //                            depthFrame.Width * Bgr32BytesPerPixel);
+                        /*************************************************************/
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// スケルトンのフレーム更新イベント
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        void kinect_SkeletonFrameReady(object sender, SkeletonFrameReadyEventArgs e)
+        {
+            try
+            {
+                // Kinectのインスタンスを取得する
+                KinectSensor kinect = sender as KinectSensor;
+                if (kinect == null)
+                {
+                    return;
+                }
+
+                // スケルトンのフレームを取得する
+                using (SkeletonFrame skeletonFrame = e.OpenSkeletonFrame())
+                {
+                    if (skeletonFrame != null)
+                    {
+                        DrawSkeleton(kinect, skeletonFrame);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                
+                MessageBox.Show(ex.ToString()); //onizawa編集
+            }
+        }
+
+        /// <summary>
+        /// スケルトンを描画する
+        /// </summary>
+        /// <param name="kinect"></param>
+        /// <param name="skeletonFrame"></param>
+        private void DrawSkeleton(KinectSensor kinect, SkeletonFrame skeletonFrame)
+        {
+            // スケルトンのデータを取得する
+            Skeleton[] skeletons = new Skeleton[skeletonFrame.SkeletonArrayLength];
+            skeletonFrame.CopySkeletonDataTo(skeletons);
+
+            canvasSkeleton.Children.Clear();
+            /*コードを追加***********************************************
+            図形描画の時に使おうと思った
+                        canvasPicture.Children.Clear();
+            /****************************************************/
+            // トラッキングされているスケルトンのジョイントを描画する
+            foreach (Skeleton skeleton in skeletons)
+            {
+                // スケルトンがトラッキング状態(デフォルトモード)の場合は、ジョイントを描画する
+                if (skeleton.TrackingState == SkeletonTrackingState.Tracked)
+                {
+                    /**コード修正＆追加************************************************************************/
+                    /*                   // ジョイントを描画する(ユーザの全jointがでる)
+                                        foreach (Joint joint in skeleton.Joints)
+                                        {
+                                            // ジョイントがトラッキングされていなければ次へ
+                                            if (joint.TrackingState == JointTrackingState.NotTracked)
+                                            {
+                                                continue;
+                                            }
+
+                                            // ジョイントの座標を描く
+                                            DrawEllipse(kinect, joint.Position);
+                                        }
+                    */
+                    //特定の部分のみの描画の準備(右手のjointについて)
+                    if (skeleton.Joints[JointType.Head].TrackingState != JointTrackingState.NotTracked)
+                    {
+                        DrawEllipse(kinect, skeleton.Joints[JointType.HandRight].Position);
+                        //Debug.WriteLine(skeleton.Joints[JointType.HandLeft].Position.Y);        //コンソールに左手の座標を表示(正なら描写のjoint取得)
+                        if (skeleton.Joints[JointType.HandLeft].Position.Y > 0)                 //右手を挙げた時にif文に入る
+                        {
+                            if (Vertex != null) Vertex.Clear();
+                            //Debug.WriteLine("OK!!!!!!");
+                            //リスト作成箇所！！！！
+                            Point point = new Point(skeleton.Joints[JointType.HandRight].Position.X, skeleton.Joints[JointType.HandRight].Position.Y);
+                            Points.AddLast(point);//鬼沢に渡す情報
+                            PPositions.AddLast(skeleton.Joints[JointType.HandRight].Position);//ユーザの右手のキャプチャしたPosiotion情報
+                        }
+                        else if (skeleton.Joints[JointType.HandLeft].Position.Y < 0)  //onizawa
+                        {
+                            ObjectInfo oi = analyzePoints(Points);
+                            float z=1;
+                            if (PPositions.Count>0) z = PPositions.Last.Value.Z;
+                            PPositions.Clear();
+                            Points.Clear();
+                            if (oi.vertex != null)
+                            {
+                                Debug.WriteLine(oi.vertex.Length);
+                                foreach (Point p in oi.vertex) 
+                                {
+                                    SkeletonPoint sp = new SkeletonPoint();
+                                    sp.X = p.x;
+                                    sp.Y = p.y;
+                                    sp.Z = z;
+                                    Vertex.AddLast(sp);
+                                }
+                            }
+                        }
+                    }
+
+                    //解析した結果得た頂点を表示
+                    foreach (SkeletonPoint sp in Vertex)
+                    {
+                        DrawEllipse(kinect, sp);
+                    }
+
+
+                    //キャプチャしたjointを描画
+                    int a = PPositions.Count;
+                    if (a > 5)
+                    {
+                        foreach (SkeletonPoint aa in PPositions)
+                        {
+                            DrawEllipse(kinect, aa);
+                        }
+                    }
+                    /**************************************************************************/
+                }
+                // スケルトンが位置追跡(ニアモードの)の場合は、スケルトン位置(Center hip)を描画する  この部分は実際不要!!
+                else if (skeleton.TrackingState == SkeletonTrackingState.PositionOnly)
+                {
+                    // スケルトンの座標を描く
+                    DrawEllipse(kinect, skeleton.Position);
+                }
+            }
+        }
+
+        /**onizawa**/
+        private ObjectInfo analyzePoints(LinkedList<Point> Points)
+        {
+            int n = Points.Count;
+            if (n < 1) return new ObjectInfo(-1, null); 
+
+            Point[] points = new Point[n];
+            int indexForNextLoop=0;//下のループのためだけの変数
+            foreach (Point p in Points) {
+                points[indexForNextLoop] = new Point(p.x+2,p.y+2); // 全ての座標を正にするために、＋２．返す時は、ObjectInfo内で-2してから返す
+                indexForNextLoop++;
+            }
+
+            //点のresample (論文を参考に)
+            double I = pathLength(points, n)/(TOTAL_SAMPLE-1);
+            double D = 0;
+            Point[] new_points = new Point[TOTAL_SAMPLE];
+            new_points[0] = points[0];
+            int new_points_i = 1;
+
+            for (int i=1; i<n; i++)
+            {
+                double d = distance(points[i-1], points[i]);
+                if ((D + d) >= I)
+                {
+                    double x = points[i - 1].x + ((I - D) / d) * (points[i].x - points[i - 1].x);
+                    double y = points[i - 1].y + ((I - D) / d) * (points[i].y - points[i - 1].y);
+                    Point q = new Point((float)x, (float)y);
+                    new_points[new_points_i] = q;
+                    new_points_i++;
+                    points[i-1] = q;
+                    i--;
+                    D = 0;
+                }
+                else
+                {
+                    D += d;
+                }
+            }
+            points = new_points;
+            for (int i = TOTAL_SAMPLE - 1; i > 0; i--) //応急処置
+            {
+                if (points[i] != null)
+                {
+                    n = i + 1;
+                    break;
+                }
+            }
+            //resampleここまで
+
+            Point mp = meanPoint(points, n);
+            Debug.WriteLine("mean point x:"+mp.x+" y:"+mp.y);
+
+            double[] ds = new double[n]; //distances
+            double dmax = 0.0;
+            double dmin = Double.MaxValue;
+            double[] vs = new double[n - 1]; //velocities
+            Boolean[] vp = new Boolean[n - 1]; // velocity is plus
+
+
+            ds[0] = distance(mp, points[0]);
+            for (int i = 1; i < n; i++)
+            {
+                //Debug.WriteLine("point"+i+" x:" + points[i].x + " y:" + points[i].y);
+                ds[i] = distance(mp, points[i]);
+                //Debug.WriteLine(ds[i]);
+                if (ds[i] > dmax) dmax = ds[i];
+                if (ds[i] < dmin) dmin = ds[i];
+                vs[i - 1] = ds[i] - ds[i - 1];
+                vp[i - 1] = vs[i - 1] > 0; //TODO: 最初動いていない時はfalseでよいのか？
+            }
+            Debug.WriteLine("dmax=" + dmax);
+            Debug.WriteLine("dmin=" + dmin);
+
+            double circle_rate = ((dmax - dmin)/dmin);
+            Debug.WriteLine("circle_rate:"+circle_rate);
+
+            if ( circle_rate < CIRCLE_THRESHOLD)
+            {
+                int type = 0;
+                Point[] vertex = { mp, points[0] };
+                Debug.WriteLine("円");
+
+                return new ObjectInfo(type, vertex);
+            }
+            else
+            {
+                Point[] vertex = getVertex(points, ds, dmax, dmin, n);
+                int type = vertex.Length;
+                if (type < 2) return new ObjectInfo(-1, null);
+                Debug.WriteLine(type + "角形");
+
+                return new ObjectInfo(type, vertex);
+            }
+        }
+
+        //TODO 要検討
+        private Point[] getVertex(Point[] points, double[] ds, double dmax, double dmin,int n)
+        {
+            double dm = (dmax + dmin) / 2;
+            dmax = (dmax - dmax) * VERTEX_THRESHOLD + dm;
+            dmin = dm - (dm - dmin) * VERTEX_THRESHOLD;
+            int count = 0; //何点連続でdmaxかdminを超えたか
+            int[] os = new int[n]; //OverState 各dsがdmaxを超えている状態なら1,dminを超えている状態なら-1,それ以外は0
+            int pos = 0; //現在のOverState
+
+            Func<double, int> OverState = d =>
+                {
+                    if (d > dmax) return 1;
+                    if (d < dmin) return -1;
+                    return 0;
+                };
+
+            for (int i = 0; i < n; i++)
+            {
+                os[i] = OverState(ds[i]);
+            }
+
+            //os=0がVERTEX_THRESHOLD_COUNT回以上連続しているところを探す
+            int over_count=0;
+            for (int i = 0; i < n; i++)
+            {
+                if (os[i] == 0)
+                {
+                    count++;
+                    if (count >= VERTEX_THRESHOLD_COUNT)
+                    {
+                        over_count = i - VERTEX_THRESHOLD_COUNT + 1;
+                    }
+                }
+                else
+                {
+                    count = 0;
+                }
+            }
+
+            //最初にVERTEX_THRESHOLD_COUNT回以上os=0となるようにする。
+            Point[] tmpP = new Point[n];
+            double[] tmpd = new double[n];
+            int[] tmpo = new int[n];
+            for (int i = 0; i < n - over_count; i++) {
+                tmpP[i] = points[i + over_count];
+                tmpd[i] = ds[i + over_count];
+                tmpo[i] = os[i + over_count];
+            }
+            for (int i = 0; i < over_count; i++) 
+            {
+                tmpP[i+n-over_count] = points[i];
+                tmpd[i + n - over_count] = ds[i];
+                tmpo[i + n - over_count] = os[i];
+            }
+            points = tmpP;
+            ds = tmpd;
+
+
+            count = 0;
+            int start = 0;
+            LinkedList<int> vertex_points = new LinkedList<int>(); //pointsの何個目の要素が頂点か
+            for (int i = 0; i < n; i++) 
+            {
+                if (pos != OverState(ds[i]))
+                {
+                    count++;
+                    if (count >= VERTEX_THRESHOLD_COUNT) 
+                    {
+                        if (pos == 1)
+                        {
+                            int max_n = getMax(ds, start, i + 1 - VERTEX_THRESHOLD_COUNT);
+                            vertex_points.AddLast(max_n);
+                        }
+
+                        pos = OverState(ds[i]);
+                        start = i + 1 - VERTEX_THRESHOLD_COUNT;
+                    }
+                }
+                else
+                {
+                    count = 0;
+                }
+            }
+
+            Point[] vertex = new Point[vertex_points.Count];
+
+            int index = 0;
+            foreach (int p_num in vertex_points)
+            {
+                vertex[index] = points[p_num];
+                index++;
+            }
+
+            return vertex;
+        }
+
+        private int getMax(double[] ds, int start, int end)
+        {
+            double max = 0;
+            int max_n = start;
+            int n = end - start + 1;
+            for (int i = 0; i < n; i++)
+            {
+                if (max < ds[start + i])
+                {
+                    max = ds[start + i];
+                    max_n = start + i;
+                }
+            }
+
+            return max_n;
+        }
+
+        private double mean(double[] d, int n)
+        {
+            double mean = 0;
+            for (int i = 0; i < n; i++)
+            {
+                mean += d[i];
+            }
+
+            return mean / n;
+        }
+
+        private Point meanPoint(Point[] points, int n)
+        {
+            Point mp = new Point(0, 0);
+
+            for (int i = 0; i < n; i++)
+            {
+                try//応急処置
+                {
+                    mp.x += points[i].x;
+                    mp.y += points[i].y;
+                }
+                catch (Exception e) 
+                {
+                    Debug.WriteLine("error at meanPoint");
+                    Debug.WriteLine("i="+i);
+                }
+            }
+
+            mp.x /= n;
+            mp.y /= n;
+
+            return mp;
+        }
+
+        private double pathLength(Point[] points, int n)
+        {
+            double d = 0;
+
+            for (int i = 1; i < n; i++)
+            {
+                d += distance(points[i-1], points[i]);
+            }
+
+            return d;
+        }
+
+        private double distance(Point p1, Point p2)
+        {
+            float dx = p1.x-p2.x;
+            float dy = p1.y-p2.y;
+            double d = Math.Sqrt(
+                        Math.Pow(dx, 2) + Math.Pow(dy, 2)
+                       );
+            return d;
+        }
+
+        private Point[] loadPoints()
+        {
+            throw new NotImplementedException();
+        }
+
+    /**onizawaEND**/
+
+        /// <summary>
+        /// ジョイントの円を描く
+        /// </summary>
+        /// <param name="kinect"></param>
+        /// <param name="position"></param>
+        private void DrawEllipse(KinectSensor kinect, SkeletonPoint position)
+        {
+            const int R = 5;
+
+            // スケルトンの座標を、RGBカメラの座標に変換する
+            ColorImagePoint point = kinect.MapSkeletonPointToColor(position, kinect.ColorStream.Format);
+
+            // 座標を画面のサイズに変換する
+            point.X = (int)ScaleTo(point.X, kinect.ColorStream.FrameWidth, canvasSkeleton.Width);
+            point.Y = (int)ScaleTo(point.Y, kinect.ColorStream.FrameHeight, canvasSkeleton.Height);
+
+            // 円を描く
+            canvasSkeleton.Children.Add(new Ellipse()
+            {
+                Fill = new SolidColorBrush(Colors.Red),
+                Margin = new Thickness(point.X - R, point.Y - R, 0, 0),
+                Width = R * 2,
+                Height = R * 2,
+            });
+        }
+        /*コードを追加***************************************************
+        //キャプチャした点を直線で結ぶ
+                private void DrawEllipse2(KinectSensor kinect, SkeletonPoint position)
+                {
+                    const int R = 5;
+
+                    // スケルトンの座標を、RGBカメラの座標に変換する
+                    ColorImagePoint point = kinect.MapSkeletonPointToColor(position, kinect.ColorStream.Format);
+
+                    // 座標を画面のサイズに変換する
+                    point.X = (int)ScaleTo(point.X, kinect.ColorStream.FrameWidth, canvasPicture.Width);
+                    point.Y = (int)ScaleTo(point.Y, kinect.ColorStream.FrameHeight, canvasPicture.Height);
+
+                    // 円を描く     CanvasPictureをxamlに書く必要あり!!!!!!!!!!!!
+                    canvasPicture.Children.Add(new Line()
+                    {
+                        Stroke = new SolidColorBrush(Colors.Green),
+                        X1 = 
+                    });
+                }
+        /****************************************************/
+
+        /// <summary>
+        /// スケールを変換する
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="source"></param>
+        /// <param name="dest"></param>
+        /// <returns></returns>
+        double ScaleTo(double value, double source, double dest)
+        {
+            return (value * dest) / source;
+        }
+
+        /// <summary>
+        /// 距離データをカラー画像に変換する
+        /// </summary>
+        /// <param name="kinect"></param>
+        /// <param name="depthFrame"></param>
+        /// <returns></returns>
+        /*
+                private byte[] ConvertDepthColor(KinectSensor kinect, DepthImageFrame depthFrame)
+                {
+                    ColorImageStream colorStream = kinect.ColorStream;
+                    DepthImageStream depthStream = kinect.DepthStream;
+
+                    // 距離カメラのピクセルごとのデータを取得する
+                    short[] depthPixel = new short[depthFrame.PixelDataLength];
+                    depthFrame.CopyPixelDataTo(depthPixel);
+
+                    // 距離カメラの座標に対応するRGBカメラの座標を取得する(座標合わせ)
+                    ColorImagePoint[] colorPoint = new ColorImagePoint[depthFrame.PixelDataLength];
+                    kinect.MapDepthFrameToColorFrame(depthStream.Format, depthPixel,
+                      colorStream.Format, colorPoint);
+
+                    byte[] depthColor = new byte[depthFrame.PixelDataLength * Bgr32BytesPerPixel];
+                    for (int index = 0; index < depthPixel.Length; index++)
+                    {
+                        // 距離カメラのデータから、プレイヤーIDと距離を取得する
+                        int player = depthPixel[index] & DepthImageFrame.PlayerIndexBitmask;
+                        int distance = depthPixel[index] >> DepthImageFrame.PlayerIndexBitmaskWidth;
+
+                        // 変換した結果が、フレームサイズを超えることがあるため、小さいほうを使う
+                        int x = Math.Min(colorPoint[index].X, colorStream.FrameWidth - 1);
+                        int y = Math.Min(colorPoint[index].Y, colorStream.FrameHeight - 1);
+                        int colorIndex = ((y * depthFrame.Width) + x) * Bgr32BytesPerPixel;
+
+                        // プレイヤーがいるピクセルの場合
+                        if (player != 0)
+                        {
+                            depthColor[colorIndex] = 255;
+                            depthColor[colorIndex + 1] = 255;
+                            depthColor[colorIndex + 2] = 255;
+                        }
+                        // プレイヤーではないピクセルの場合
+                        else
+                        {
+                            // サポート外 0-40cm
+                            if (distance == depthStream.UnknownDepth)
+                            {
+                                depthColor[colorIndex] = 0;
+                                depthColor[colorIndex + 1] = 0;
+                                depthColor[colorIndex + 2] = 255;
+                            }
+                            // 近すぎ 40cm-80cm(default mode)
+                            else if (distance == depthStream.TooNearDepth)
+                            {
+                                depthColor[colorIndex] = 0;
+                                depthColor[colorIndex + 1] = 255;
+                                depthColor[colorIndex + 2] = 0;
+                            }
+                            // 遠すぎ 3m(Near),4m(Default)-8m
+                            else if (distance == depthStream.TooFarDepth)
+                            {
+                                depthColor[colorIndex] = 255;
+                                depthColor[colorIndex + 1] = 0;
+                                depthColor[colorIndex + 2] = 0;
+                            }
+                            // 有効な距離データ
+                            else
+                            {
+                                depthColor[colorIndex] = 0;
+                                depthColor[colorIndex + 1] = 255;
+                                depthColor[colorIndex + 2] = 255;
+                            }
+                        }
+                    }
+
+                    return depthColor;
+                }
+        */
+        /// <summary>
+        /// 距離カメラの通常/近接モード変更イベント
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void comboBoxRange_SelectionChanged(object sender,
+          System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            try
+            {
+                KinectSensor.KinectSensors[0].DepthStream.Range = (DepthRange)comboBoxRange.SelectedIndex;
+            }
+            catch (Exception)
+            {
+                comboBoxRange.SelectedIndex = 0;
+            }
+        }
+
+        /// <summary>
+        /// Windowが閉じられるときのイベント
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            StopKinect(KinectSensor.KinectSensors[0]);
+        }
+    }
+
+    /***コード追加*********************************************/
+    //鬼沢に渡すjointのX,Y座標
+    class Point
+    {
+        public float x;
+        public float y;
+        public Point(float x, float y)
+        {
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+
+    /*************************************************/
+
+    /**onizawa**/
+    class ObjectInfo
+    {
+        public int type; //エラーの場合-1,円なら0, それ以外なら頂点の数（線なら2）
+        public Point[] vertex; //円ならvertex[0]が中心点で、vertex[1]が円上の点の一つ
+        //円以外なら各頂点の座標
+
+        public ObjectInfo(int type, Point[] vertex_in)
+        {
+            if (type > -1) 
+            {
+                int n = vertex_in.Length;
+                for (int i = 0; i < n; i++) //最初に全ての点を+2したので元に戻す
+                {
+                    vertex_in[i] = new Point(vertex_in[i].x - 2, vertex_in[i].y - 2);
+                }
+            }
+
+            this.type = type;
+            this.vertex = vertex_in;
+            //if (type < 0) Debug.WriteLine("ObjectInfo: エラー");
+        }
+    }
+    /**onizawaEND**/
+}
