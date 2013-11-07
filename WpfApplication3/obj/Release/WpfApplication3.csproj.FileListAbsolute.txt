@@ -1,0 +1,13 @@
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\bin\Release\WpfApplication3.exe.config
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\bin\Release\WpfApplication3.exe
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\bin\Release\WpfApplication3.pdb
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\obj\Release\WpfApplication3.csprojResolveAssemblyReference.cache
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\obj\Release\MainWindow.baml
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\obj\Release\MainWindow.g.cs
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\obj\Release\App.g.cs
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\obj\Release\WpfApplication3_MarkupCompile.cache
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\obj\Release\WpfApplication3.g.resources
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\obj\Release\WpfApplication3.Properties.Resources.resources
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\obj\Release\WpfApplication3.csproj.GenerateResource.Cache
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\obj\Release\WpfApplication3.exe
+C:\Users\KAZUYA\documents\visual studio 2012\Projects\WpfApplication3\WpfApplication3\obj\Release\WpfApplication3.pdb
