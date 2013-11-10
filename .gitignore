@@ -1,3 +1,5 @@
 *
 !.gitignore
-!*.css
+!*.cs
+!*.xaml
+!*.config
