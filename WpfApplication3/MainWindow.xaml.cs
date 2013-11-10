@@ -17,8 +17,11 @@ namespace SkeletonTracking
         readonly int Bgr32BytesPerPixel = PixelFormats.Bgr32.BitsPerPixel / 8;
         /*コード追加*********************/
         LinkedList<Point> Points = new LinkedList<Point>();//X,Y座標のみ
-        LinkedList<SkeletonPoint> PPositions = new LinkedList<SkeletonPoint>();//キャプチャしたユーザの右手のposition
+        LinkedList<SkeletonPoint> PPositions = new LinkedList<SkeletonPoint>();//キャプチャユーザーの右手のposition．一時保存用
         LinkedList<SkeletonPoint> Vertex = new LinkedList<SkeletonPoint>(); //オブジェクト認識した結果の頂点とか
+        LinkedList<SkeletonPoint> PPositions1 = new LinkedList<SkeletonPoint>();//キャプチャしたプレイヤー１の右手のposition
+        LinkedList<SkeletonPoint> PPositions2 = new LinkedList<SkeletonPoint>();//キャプチャしたプレイヤー2の右手のposition
+        static bool wasPlayerId1Tracked = false;
         /********************************/
         /**onizawa**/
         static int TOTAL_SAMPLE = 64;
@@ -191,11 +194,13 @@ namespace SkeletonTracking
                 }
 
                 // スケルトンのフレームを取得する
+                int playerId = 1;
                 using (SkeletonFrame skeletonFrame = e.OpenSkeletonFrame())
                 {
                     if (skeletonFrame != null)
                     {
-                        DrawSkeleton(kinect, skeletonFrame);
+                        // 最初に誰かが対象になった時
+                        DrawSkeleton(kinect, skeletonFrame, playerId);
                     }
                 }
             }
@@ -211,7 +216,7 @@ namespace SkeletonTracking
         /// </summary>
         /// <param name="kinect"></param>
         /// <param name="skeletonFrame"></param>
-        private void DrawSkeleton(KinectSensor kinect, SkeletonFrame skeletonFrame)
+        private void DrawSkeleton(KinectSensor kinect, SkeletonFrame skeletonFrame, int playerId)
         {
             // スケルトンのデータを取得する
             Skeleton[] skeletons = new Skeleton[skeletonFrame.SkeletonArrayLength];
@@ -245,10 +250,11 @@ namespace SkeletonTracking
                     //特定の部分のみの描画の準備(右手のjointについて)
                     if (skeleton.Joints[JointType.Head].TrackingState != JointTrackingState.NotTracked)
                     {
-                        DrawEllipse(kinect, skeleton.Joints[JointType.HandRight].Position);
+                        DrawEllipse(kinect, skeleton.Joints[JointType.HandRight].Position, playerId);
                         //Debug.WriteLine(skeleton.Joints[JointType.HandLeft].Position.Y);        //コンソールに左手の座標を表示(正なら描写のjoint取得)
                         if (skeleton.Joints[JointType.HandLeft].Position.Y > 0)                 //右手を挙げた時にif文に入る
                         {
+                            wasPlayerId1Tracked = true;
                             if (Vertex != null) Vertex.Clear();
                             //Debug.WriteLine("OK!!!!!!");
                             //リスト作成箇所！！！！
@@ -256,12 +262,14 @@ namespace SkeletonTracking
                             Points.AddLast(point);//鬼沢に渡す情報
                             PPositions.AddLast(skeleton.Joints[JointType.HandRight].Position);//ユーザの右手のキャプチャしたPosiotion情報
                         }
+                        
                         else if (skeleton.Joints[JointType.HandLeft].Position.Y < 0)  //onizawa
                         {
+                            /*
                             ObjectInfo oi = analyzePoints(Points);
                             float z=1;
                             if (PPositions.Count>0) z = PPositions.Last.Value.Z;
-                            PPositions.Clear();
+                            //PPositions.Clear();
                             Points.Clear();
                             if (oi.vertex != null)
                             {
@@ -275,33 +283,62 @@ namespace SkeletonTracking
                                     Vertex.AddLast(sp);
                                 }
                             }
+                             */
+                            //if (PPositions.First == PPositions.Last) PPositions.Clear();
+                            if (PPositions.Count > 5 && PPositions1.Count == 0)
+                            {
+                                foreach (SkeletonPoint pp in PPositions)
+                                {
+                                    PPositions1.AddLast(pp);
+                                }
+                                PPositions.Clear();
+                            }
+                            if (PPositions.Count > 5 && PPositions1.Count != 0 && PPositions2.Count == 0)
+                            {
+                                foreach (SkeletonPoint pp in PPositions)
+                                {
+                                    PPositions2.AddLast(pp);
+                                }
+                                PPositions.Clear();
+                            }
                         }
                     }
-
+                    /*
                     //解析した結果得た頂点を表示
                     foreach (SkeletonPoint sp in Vertex)
                     {
-                        DrawEllipse(kinect, sp);
+                        DrawEllipse(kinect, sp, playerId);
                     }
-
+                    */
 
                     //キャプチャしたjointを描画
-                    int a = PPositions.Count;
+                    int a = PPositions1.Count;
                     if (a > 5)
                     {
-                        foreach (SkeletonPoint aa in PPositions)
+                        foreach (SkeletonPoint aa in PPositions1)
                         {
-                            DrawEllipse(kinect, aa);
+                            DrawEllipse(kinect, aa, 1);
+                        }
+                    }
+                    int b = PPositions2.Count;
+                    if (b > 5)
+                    {
+                        foreach (SkeletonPoint bb in PPositions2)
+                        {
+                            DrawEllipse(kinect, bb, 2);
                         }
                     }
                     /**************************************************************************/
                 }
+                /*
                 // スケルトンが位置追跡(ニアモードの)の場合は、スケルトン位置(Center hip)を描画する  この部分は実際不要!!
                 else if (skeleton.TrackingState == SkeletonTrackingState.PositionOnly)
                 {
                     // スケルトンの座標を描く
-                    DrawEllipse(kinect, skeleton.Position);
+                    DrawEllipse(kinect, skeleton.Position, playerId);
                 }
+                 */ 
+
             }
         }
 
@@ -584,7 +621,7 @@ namespace SkeletonTracking
         /// </summary>
         /// <param name="kinect"></param>
         /// <param name="position"></param>
-        private void DrawEllipse(KinectSensor kinect, SkeletonPoint position)
+        private void DrawEllipse(KinectSensor kinect, SkeletonPoint position, int playerId)
         {
             const int R = 5;
 
@@ -595,14 +632,27 @@ namespace SkeletonTracking
             point.X = (int)ScaleTo(point.X, kinect.ColorStream.FrameWidth, canvasSkeleton.Width);
             point.Y = (int)ScaleTo(point.Y, kinect.ColorStream.FrameHeight, canvasSkeleton.Height);
 
-            // 円を描く
-            canvasSkeleton.Children.Add(new Ellipse()
+            // 円を描く playerId == 1;
+            if (playerId == 1)
             {
-                Fill = new SolidColorBrush(Colors.Red),
-                Margin = new Thickness(point.X - R, point.Y - R, 0, 0),
-                Width = R * 2,
-                Height = R * 2,
-            });
+                canvasSkeleton.Children.Add(new Ellipse()
+                {
+                    Fill = new SolidColorBrush(Colors.Red),
+                    Margin = new Thickness(point.X - R, point.Y - R, 0, 0),
+                    Width = R * 2,
+                    Height = R * 2,
+                });
+            }
+            else
+            {
+                canvasSkeleton.Children.Add(new Ellipse()
+                {
+                    Fill = new SolidColorBrush(Colors.Green),
+                    Margin = new Thickness(point.X - R, point.Y - R, 0, 0),
+                    Width = R * 2,
+                    Height = R * 2,
+                });
+            }
         }
         /*コードを追加***************************************************
         //キャプチャした点を直線で結ぶ
