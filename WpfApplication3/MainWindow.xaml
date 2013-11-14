@@ -6,11 +6,14 @@
     <Grid>
         <Image Name="imageRgb" Stretch="Uniform" />
         <Image Name="imageDepth" Stretch="Uniform" Opacity="0.5" />
+        <TextBox Name="textBox1" VerticalAlignment="Top" />
         <Canvas Name="canvasSkeleton"
             Width="{Binding ElementName=imageRgb, Path=ActualWidth}"
             Height="{Binding ElementName=imageRgb, Path=ActualHeight}" />
         <ComboBox Height="24" HorizontalAlignment="Left" Name="comboBoxRange"
               VerticalAlignment="Top" Width="120"
               SelectionChanged="comboBoxRange_SelectionChanged" />
+        <TextBlock FontSize="100" Margin="10,200,300,0" Name="textblock1" Background="White"/>
+        <TextBlock FontSize="100" Margin="300,200,10,0" Name="textblock2" Background="White"/>
     </Grid>
 </Window>

@@ -6,6 +6,8 @@ using Microsoft.Kinect;
 using System.Windows.Shapes;
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.Globalization;
+
 
 namespace SkeletonTracking
 {
@@ -327,6 +329,11 @@ namespace SkeletonTracking
                         {
                             DrawEllipse(kinect, bb, 2);
                         }
+                    }
+                    if (a > 5 && b > 5)
+                    {
+                        textblock1.Text = "test";
+                        textblock2.Text = "test2";
                     }
                     /**************************************************************************/
                 }
@@ -792,6 +799,7 @@ namespace SkeletonTracking
         {
             StopKinect(KinectSensor.KinectSensors[0]);
         }
+
     }
 
     /***コード追加*********************************************/
