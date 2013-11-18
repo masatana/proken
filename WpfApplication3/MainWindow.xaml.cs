@@ -158,20 +158,6 @@ namespace SkeletonTracking
                 {
                     return;
                 }
-
-                // 距離カメラのフレームデータを取得する
-                using (DepthImageFrame depthFrame = e.OpenDepthImageFrame())
-                {
-                    if (depthFrame != null)
-                    {
-                        /**不要なので削除***********************************************************/
-                        // 距離データを画像化して表示
-                        //                        imageDepth.Source = BitmapSource.Create(depthFrame.Width, depthFrame.Height, 96, 96,
-                        //                            PixelFormats.Bgr32, null, ConvertDepthColor(kinect, depthFrame),
-                        //                            depthFrame.Width * Bgr32BytesPerPixel);
-                        /*************************************************************/
-                    }
-                }
             }
             catch (Exception ex)
             {
@@ -225,10 +211,6 @@ namespace SkeletonTracking
             skeletonFrame.CopySkeletonDataTo(skeletons);
 
             canvasSkeleton.Children.Clear();
-            /*コードを追加***********************************************
-            図形描画の時に使おうと思った
-                        canvasPicture.Children.Clear();
-            /****************************************************/
             // トラッキングされているスケルトンのジョイントを描画する
             foreach (Skeleton skeleton in skeletons)
             {
@@ -254,7 +236,7 @@ namespace SkeletonTracking
                     {
                         DrawEllipse(kinect, skeleton.Joints[JointType.HandRight].Position, playerId);
                         //Debug.WriteLine(skeleton.Joints[JointType.HandLeft].Position.Y);        //コンソールに左手の座標を表示(正なら描写のjoint取得)
-                        if (skeleton.Joints[JointType.HandLeft].Position.Y > 0)                 //右手を挙げた時にif文に入る
+                        if (skeleton.Joints[JointType.HandLeft].Position.Y > 0)                 //左手を挙げた時にif文に入る
                         {
                             wasPlayerId1Tracked = true;
                             if (Vertex != null) Vertex.Clear();
@@ -330,6 +312,8 @@ namespace SkeletonTracking
                             DrawEllipse(kinect, bb, 2);
                         }
                     }
+                    // ユーザaとユーザbがそれぞれ書き終わったら，ステータス表示
+                    // というかBattleStageに入るべきか
                     if (a > 5 && b > 5)
                     {
                         textblock1.Text = "test";
@@ -337,15 +321,6 @@ namespace SkeletonTracking
                     }
                     /**************************************************************************/
                 }
-                /*
-                // スケルトンが位置追跡(ニアモードの)の場合は、スケルトン位置(Center hip)を描画する  この部分は実際不要!!
-                else if (skeleton.TrackingState == SkeletonTrackingState.PositionOnly)
-                {
-                    // スケルトンの座標を描く
-                    DrawEllipse(kinect, skeleton.Position, playerId);
-                }
-                 */ 
-
             }
         }
 
@@ -695,83 +670,6 @@ namespace SkeletonTracking
             return (value * dest) / source;
         }
 
-        /// <summary>
-        /// 距離データをカラー画像に変換する
-        /// </summary>
-        /// <param name="kinect"></param>
-        /// <param name="depthFrame"></param>
-        /// <returns></returns>
-        /*
-                private byte[] ConvertDepthColor(KinectSensor kinect, DepthImageFrame depthFrame)
-                {
-                    ColorImageStream colorStream = kinect.ColorStream;
-                    DepthImageStream depthStream = kinect.DepthStream;
-
-                    // 距離カメラのピクセルごとのデータを取得する
-                    short[] depthPixel = new short[depthFrame.PixelDataLength];
-                    depthFrame.CopyPixelDataTo(depthPixel);
-
-                    // 距離カメラの座標に対応するRGBカメラの座標を取得する(座標合わせ)
-                    ColorImagePoint[] colorPoint = new ColorImagePoint[depthFrame.PixelDataLength];
-                    kinect.MapDepthFrameToColorFrame(depthStream.Format, depthPixel,
-                      colorStream.Format, colorPoint);
-
-                    byte[] depthColor = new byte[depthFrame.PixelDataLength * Bgr32BytesPerPixel];
-                    for (int index = 0; index < depthPixel.Length; index++)
-                    {
-                        // 距離カメラのデータから、プレイヤーIDと距離を取得する
-                        int player = depthPixel[index] & DepthImageFrame.PlayerIndexBitmask;
-                        int distance = depthPixel[index] >> DepthImageFrame.PlayerIndexBitmaskWidth;
-
-                        // 変換した結果が、フレームサイズを超えることがあるため、小さいほうを使う
-                        int x = Math.Min(colorPoint[index].X, colorStream.FrameWidth - 1);
-                        int y = Math.Min(colorPoint[index].Y, colorStream.FrameHeight - 1);
-                        int colorIndex = ((y * depthFrame.Width) + x) * Bgr32BytesPerPixel;
-
-                        // プレイヤーがいるピクセルの場合
-                        if (player != 0)
-                        {
-                            depthColor[colorIndex] = 255;
-                            depthColor[colorIndex + 1] = 255;
-                            depthColor[colorIndex + 2] = 255;
-                        }
-                        // プレイヤーではないピクセルの場合
-                        else
-                        {
-                            // サポート外 0-40cm
-                            if (distance == depthStream.UnknownDepth)
-                            {
-                                depthColor[colorIndex] = 0;
-                                depthColor[colorIndex + 1] = 0;
-                                depthColor[colorIndex + 2] = 255;
-                            }
-                            // 近すぎ 40cm-80cm(default mode)
-                            else if (distance == depthStream.TooNearDepth)
-                            {
-                                depthColor[colorIndex] = 0;
-                                depthColor[colorIndex + 1] = 255;
-                                depthColor[colorIndex + 2] = 0;
-                            }
-                            // 遠すぎ 3m(Near),4m(Default)-8m
-                            else if (distance == depthStream.TooFarDepth)
-                            {
-                                depthColor[colorIndex] = 255;
-                                depthColor[colorIndex + 1] = 0;
-                                depthColor[colorIndex + 2] = 0;
-                            }
-                            // 有効な距離データ
-                            else
-                            {
-                                depthColor[colorIndex] = 0;
-                                depthColor[colorIndex + 1] = 255;
-                                depthColor[colorIndex + 2] = 255;
-                            }
-                        }
-                    }
-
-                    return depthColor;
-                }
-        */
         /// <summary>
         /// 距離カメラの通常/近接モード変更イベント
         /// </summary>
