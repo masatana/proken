@@ -7,6 +7,7 @@ using System.Windows.Shapes;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Timers;
 
 
 namespace SkeletonTracking
@@ -24,6 +25,7 @@ namespace SkeletonTracking
         LinkedList<SkeletonPoint> PPositions1 = new LinkedList<SkeletonPoint>();//キャプチャしたプレイヤー１の右手のposition
         LinkedList<SkeletonPoint> PPositions2 = new LinkedList<SkeletonPoint>();//キャプチャしたプレイヤー2の右手のposition
         static bool wasPlayerId1Tracked = false;
+        private static System.Timers.Timer aTimer;
         /********************************/
         /**onizawa**/
         static int TOTAL_SAMPLE = 64;
@@ -217,20 +219,6 @@ namespace SkeletonTracking
                 // スケルトンがトラッキング状態(デフォルトモード)の場合は、ジョイントを描画する
                 if (skeleton.TrackingState == SkeletonTrackingState.Tracked)
                 {
-                    /**コード修正＆追加************************************************************************/
-                    /*                   // ジョイントを描画する(ユーザの全jointがでる)
-                                        foreach (Joint joint in skeleton.Joints)
-                                        {
-                                            // ジョイントがトラッキングされていなければ次へ
-                                            if (joint.TrackingState == JointTrackingState.NotTracked)
-                                            {
-                                                continue;
-                                            }
-
-                                            // ジョイントの座標を描く
-                                            DrawEllipse(kinect, joint.Position);
-                                        }
-                    */
                     //特定の部分のみの描画の準備(右手のjointについて)
                     if (skeleton.Joints[JointType.Head].TrackingState != JointTrackingState.NotTracked)
                     {
@@ -249,77 +237,54 @@ namespace SkeletonTracking
                         
                         else if (skeleton.Joints[JointType.HandLeft].Position.Y < 0)  //onizawa
                         {
-                            /*
-                            ObjectInfo oi = analyzePoints(Points);
-                            float z=1;
-                            if (PPositions.Count>0) z = PPositions.Last.Value.Z;
-                            //PPositions.Clear();
-                            Points.Clear();
-                            if (oi.vertex != null)
-                            {
-                                Debug.WriteLine(oi.vertex.Length);
-                                foreach (Point p in oi.vertex) 
-                                {
-                                    SkeletonPoint sp = new SkeletonPoint();
-                                    sp.X = p.x;
-                                    sp.Y = p.y;
-                                    sp.Z = z;
-                                    Vertex.AddLast(sp);
-                                }
-                            }
-                             */
                             //if (PPositions.First == PPositions.Last) PPositions.Clear();
                             if (PPositions.Count > 5 && PPositions1.Count == 0)
                             {
-                                foreach (SkeletonPoint pp in PPositions)
+                                foreach (SkeletonPoint skeletonpoint in PPositions)
                                 {
-                                    PPositions1.AddLast(pp);
+                                    PPositions1.AddLast(skeletonpoint);
                                 }
                                 PPositions.Clear();
                             }
                             if (PPositions.Count > 5 && PPositions1.Count != 0 && PPositions2.Count == 0)
                             {
-                                foreach (SkeletonPoint pp in PPositions)
+                                foreach (SkeletonPoint skeletonpoint in PPositions)
                                 {
-                                    PPositions2.AddLast(pp);
+                                    PPositions2.AddLast(skeletonpoint);
                                 }
                                 PPositions.Clear();
                             }
                         }
                     }
-                    /*
-                    //解析した結果得た頂点を表示
-                    foreach (SkeletonPoint sp in Vertex)
-                    {
-                        DrawEllipse(kinect, sp, playerId);
-                    }
-                    */
+
 
                     //キャプチャしたjointを描画
-                    int a = PPositions1.Count;
-                    if (a > 5)
+
+                    if (PPositions1.Count > 5 && PPositions2.Count == 0)
                     {
-                        foreach (SkeletonPoint aa in PPositions1)
+                        foreach (SkeletonPoint skeletonpoint in PPositions1)
                         {
-                            DrawEllipse(kinect, aa, 1);
+                            DrawEllipse(kinect, skeletonpoint, 1);
                         }
                     }
-                    int b = PPositions2.Count;
-                    if (b > 5)
+
+                    /* 一時的にコメントアウト
+                    if (PPositions2.Count > 5)
                     {
-                        foreach (SkeletonPoint bb in PPositions2)
+                        foreach (SkeletonPoint skeletonpoint in PPositions2)
                         {
-                            DrawEllipse(kinect, bb, 2);
+                            DrawEllipse(kinect, skeletonpoint, 2);
                         }
                     }
+                     * */
                     // ユーザaとユーザbがそれぞれ書き終わったら，ステータス表示
                     // というかBattleStageに入るべきか
-                    if (a > 5 && b > 5)
+                    if (PPositions1.Count > 5 && PPositions2.Count > 5)
                     {
                         textblock1.Text = "test";
                         textblock2.Text = "test2";
+                        DrawBattleStage(kinect);
                     }
-                    /**************************************************************************/
                 }
             }
         }
@@ -636,27 +601,18 @@ namespace SkeletonTracking
                 });
             }
         }
-        /*コードを追加***************************************************
-        //キャプチャした点を直線で結ぶ
-                private void DrawEllipse2(KinectSensor kinect, SkeletonPoint position)
-                {
-                    const int R = 5;
-
-                    // スケルトンの座標を、RGBカメラの座標に変換する
-                    ColorImagePoint point = kinect.MapSkeletonPointToColor(position, kinect.ColorStream.Format);
-
-                    // 座標を画面のサイズに変換する
-                    point.X = (int)ScaleTo(point.X, kinect.ColorStream.FrameWidth, canvasPicture.Width);
-                    point.Y = (int)ScaleTo(point.Y, kinect.ColorStream.FrameHeight, canvasPicture.Height);
-
-                    // 円を描く     CanvasPictureをxamlに書く必要あり!!!!!!!!!!!!
-                    canvasPicture.Children.Add(new Line()
-                    {
-                        Stroke = new SolidColorBrush(Colors.Green),
-                        X1 = 
-                    });
-                }
-        /****************************************************/
+        private void DrawBattleStage(KinectSensor kinect)
+        {
+            foreach (SkeletonPoint skeletonpoint in PPositions1)
+            {
+                DrawEllipse(kinect, skeletonpoint, 1);
+            }
+            foreach (SkeletonPoint skeletonpoint in PPositions2)
+            {
+                DrawEllipse(kinect, skeletonpoint, 2);
+            }
+            //TODO ダメージ表示処理など入れる
+        }
 
         /// <summary>
         /// スケールを変換する
@@ -699,8 +655,6 @@ namespace SkeletonTracking
         }
 
     }
-
-    /***コード追加*********************************************/
     //鬼沢に渡すjointのX,Y座標
     class Point
     {
@@ -713,8 +667,6 @@ namespace SkeletonTracking
         }
     }
 
-
-    /*************************************************/
 
     /**onizawa**/
     class ObjectInfo
