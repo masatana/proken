@@ -24,8 +24,11 @@ namespace SkeletonTracking
         LinkedList<SkeletonPoint> Vertex = new LinkedList<SkeletonPoint>(); //オブジェクト認識した結果の頂点とか
         LinkedList<SkeletonPoint> PPositions1 = new LinkedList<SkeletonPoint>();//キャプチャしたプレイヤー１の右手のposition
         LinkedList<SkeletonPoint> PPositions2 = new LinkedList<SkeletonPoint>();//キャプチャしたプレイヤー2の右手のposition
+        LinkedList<ColorImagePoint> BPositions1;
+        LinkedList<ColorImagePoint> BPositions2;
         int player1_hp = 100; //player1用の体力 TODO intでいいのかな？
         int player2_hp = 100;
+        bool t_flag = false;
         DispatcherTimer dispatcherTimer;
 
         /********************************/
@@ -289,6 +292,7 @@ namespace SkeletonTracking
                         //textblock1.Text = "100";
                         //textblock2.Text = "100";
                         DrawBattleStage(kinect);
+                        DrawBattleCharacters();
                         //tekitounaflag = true;
                         //return true;
                     }
@@ -608,7 +612,7 @@ namespace SkeletonTracking
                 });
             }
         }
-        private void DrawEllipse(KinectSensor kinect, ColorImagePoint point, int playerId)
+        private void DrawEllipse(ColorImagePoint point, int playerId)
         {
             const int R = 5;
 
@@ -637,35 +641,43 @@ namespace SkeletonTracking
 
         private void DrawBattleStage(KinectSensor kinect)
         {
-<<<<<<< HEAD
+            if (t_flag)
+            {
+                return;
+            }
+            t_flag = true;
             //StopKinect(kinect);
             dispatcherTimer = new DispatcherTimer(DispatcherPriority.Normal);
             dispatcherTimer.Interval = TimeSpan.FromMilliseconds(1000);
             
-            foreach (SkeletonPoint skeletonpoint in PPositions1)
-=======
-            LinkedList<ColorImagePoint> BPositions1 = toBattlePosition(PPositions1, 1, kinect);
-            LinkedList<ColorImagePoint> BPositions2 = toBattlePosition(PPositions2, 2, kinect);
-
-            foreach (ColorImagePoint skeletonpoint in BPositions1)
->>>>>>> 36f4fd8d4c88baefaf01500fc9281c0c15e04dd5
-            {
-                DrawEllipse(kinect, skeletonpoint, 1);
-            }
-            foreach (ColorImagePoint skeletonpoint in BPositions2)
-            {
-                DrawEllipse(kinect, skeletonpoint, 2);
-            }
-            StopKinect(kinect);
+            BPositions1 = toBattlePosition(PPositions1, 1, kinect);
+            BPositions2 = toBattlePosition(PPositions2, 2, kinect);
+            //StopKinect(kinect);
             dispatcherTimer.Tick += dispatcherTimer_Tick;
             dispatcherTimer.Start();
-            
+
+
+            //textblock1.Text = (player1_hp--).ToString();
+            //System.Threading.Thread.Sleep(1000);
 
             //TODO ダメージ表示処理など入れる
         }
         private void dispatcherTimer_Tick(object sender, EventArgs e)
         {
             textblock1.Text = (player1_hp--).ToString();
+
+        }
+
+        private void DrawBattleCharacters()
+        {
+            foreach (ColorImagePoint skeletonpoint in BPositions1)
+            {
+                DrawEllipse(skeletonpoint, 1);
+            }
+            foreach (ColorImagePoint skeletonpoint in BPositions2)
+            {
+                DrawEllipse(skeletonpoint, 2);
+            }
         }
 
         private LinkedList<ColorImagePoint> toBattlePosition(LinkedList<SkeletonPoint> PPositions, int field, KinectSensor kinect)
