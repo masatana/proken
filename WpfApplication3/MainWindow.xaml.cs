@@ -8,7 +8,7 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Timers;
-
+using System.Windows.Threading;
 
 namespace SkeletonTracking
 {
@@ -24,8 +24,10 @@ namespace SkeletonTracking
         LinkedList<SkeletonPoint> Vertex = new LinkedList<SkeletonPoint>(); //オブジェクト認識した結果の頂点とか
         LinkedList<SkeletonPoint> PPositions1 = new LinkedList<SkeletonPoint>();//キャプチャしたプレイヤー１の右手のposition
         LinkedList<SkeletonPoint> PPositions2 = new LinkedList<SkeletonPoint>();//キャプチャしたプレイヤー2の右手のposition
-        static bool wasPlayerId1Tracked = false;
-        private static System.Timers.Timer aTimer;
+        int player1_hp = 100; //player1用の体力 TODO intでいいのかな？
+        int player2_hp = 100;
+        DispatcherTimer dispatcherTimer;
+
         /********************************/
         /**onizawa**/
         static int TOTAL_SAMPLE = 64;
@@ -152,6 +154,7 @@ namespace SkeletonTracking
         /// <param name="e"></param>
         void kinect_DepthFrameReady(object sender, DepthImageFrameReadyEventArgs e)
         {
+
             try
             {
                 // センサーのインスタンスを取得する
@@ -174,6 +177,7 @@ namespace SkeletonTracking
         /// <param name="e"></param>
         void kinect_SkeletonFrameReady(object sender, SkeletonFrameReadyEventArgs e)
         {
+            bool tekitounaflag = false;
             try
             {
                 // Kinectのインスタンスを取得する
@@ -193,6 +197,7 @@ namespace SkeletonTracking
                         DrawSkeleton(kinect, skeletonFrame, playerId);
                     }
                 }
+
             }
             catch (Exception ex)
             {
@@ -226,7 +231,7 @@ namespace SkeletonTracking
                         //Debug.WriteLine(skeleton.Joints[JointType.HandLeft].Position.Y);        //コンソールに左手の座標を表示(正なら描写のjoint取得)
                         if (skeleton.Joints[JointType.HandLeft].Position.Y > 0)                 //左手を挙げた時にif文に入る
                         {
-                            wasPlayerId1Tracked = true;
+                            //wasPlayerId1Tracked = true;
                             if (Vertex != null) Vertex.Clear();
                             //Debug.WriteLine("OK!!!!!!");
                             //リスト作成箇所！！！！
@@ -281,9 +286,11 @@ namespace SkeletonTracking
                     // というかBattleStageに入るべきか
                     if (PPositions1.Count > 5 && PPositions2.Count > 5)
                     {
-                        textblock1.Text = "test";
-                        textblock2.Text = "test2";
+                        //textblock1.Text = "100";
+                        //textblock2.Text = "100";
                         DrawBattleStage(kinect);
+                        //tekitounaflag = true;
+                        //return true;
                     }
                 }
             }
@@ -603,6 +610,10 @@ namespace SkeletonTracking
         }
         private void DrawBattleStage(KinectSensor kinect)
         {
+            //StopKinect(kinect);
+            dispatcherTimer = new DispatcherTimer(DispatcherPriority.Normal);
+            dispatcherTimer.Interval = TimeSpan.FromMilliseconds(1000);
+            
             foreach (SkeletonPoint skeletonpoint in PPositions1)
             {
                 DrawEllipse(kinect, skeletonpoint, 1);
@@ -611,7 +622,16 @@ namespace SkeletonTracking
             {
                 DrawEllipse(kinect, skeletonpoint, 2);
             }
+            StopKinect(kinect);
+            dispatcherTimer.Tick += dispatcherTimer_Tick;
+            dispatcherTimer.Start();
+            
+
             //TODO ダメージ表示処理など入れる
+        }
+        private void dispatcherTimer_Tick(object sender, EventArgs e)
+        {
+            textblock1.Text = (player1_hp--).ToString();
         }
 
         /// <summary>
