@@ -608,17 +608,51 @@ namespace SkeletonTracking
                 });
             }
         }
+        private void DrawEllipse(KinectSensor kinect, ColorImagePoint point, int playerId)
+        {
+            const int R = 5;
+
+            // 円を描く playerId == 1;
+            if (playerId == 1)
+            {
+                canvasSkeleton.Children.Add(new Ellipse()
+                {
+                    Fill = new SolidColorBrush(Colors.Red),
+                    Margin = new Thickness(point.X - R, point.Y - R, 0, 0),
+                    Width = R * 2,
+                    Height = R * 2,
+                });
+            }
+            else
+            {
+                canvasSkeleton.Children.Add(new Ellipse()
+                {
+                    Fill = new SolidColorBrush(Colors.Green),
+                    Margin = new Thickness(point.X - R, point.Y - R, 0, 0),
+                    Width = R * 2,
+                    Height = R * 2,
+                });
+            }
+        }
+
         private void DrawBattleStage(KinectSensor kinect)
         {
+<<<<<<< HEAD
             //StopKinect(kinect);
             dispatcherTimer = new DispatcherTimer(DispatcherPriority.Normal);
             dispatcherTimer.Interval = TimeSpan.FromMilliseconds(1000);
             
             foreach (SkeletonPoint skeletonpoint in PPositions1)
+=======
+            LinkedList<ColorImagePoint> BPositions1 = toBattlePosition(PPositions1, 1, kinect);
+            LinkedList<ColorImagePoint> BPositions2 = toBattlePosition(PPositions2, 2, kinect);
+
+            foreach (ColorImagePoint skeletonpoint in BPositions1)
+>>>>>>> 36f4fd8d4c88baefaf01500fc9281c0c15e04dd5
             {
                 DrawEllipse(kinect, skeletonpoint, 1);
             }
-            foreach (SkeletonPoint skeletonpoint in PPositions2)
+            foreach (ColorImagePoint skeletonpoint in BPositions2)
             {
                 DrawEllipse(kinect, skeletonpoint, 2);
             }
@@ -632,6 +666,76 @@ namespace SkeletonTracking
         private void dispatcherTimer_Tick(object sender, EventArgs e)
         {
             textblock1.Text = (player1_hp--).ToString();
+        }
+
+        private LinkedList<ColorImagePoint> toBattlePosition(LinkedList<SkeletonPoint> PPositions, int field, KinectSensor kinect)
+        {
+            LinkedList<ColorImagePoint> BattlePositions = new LinkedList<ColorImagePoint>();
+
+            //座標の変換と、最大最小のXYの取得
+            int minX = 1000;
+            int maxX = 0;
+            int minY = 1000;
+            int maxY = 0;
+            foreach (SkeletonPoint position in PPositions)
+            {
+                ColorImagePoint point = kinect.MapSkeletonPointToColor(position, kinect.ColorStream.Format);
+                // 座標を画面のサイズに変換する
+                point.X = (int)ScaleTo(point.X, kinect.ColorStream.FrameWidth, canvasSkeleton.Width);
+                point.Y = (int)ScaleTo(point.Y, kinect.ColorStream.FrameHeight, canvasSkeleton.Height);
+                //Console.WriteLine("X: {0}, Y: {1}  ({2})", point.X, point.Y, field);
+
+                if (point.X < minX) minX = point.X;
+                if (point.X > maxX) maxX = point.X;
+                if (point.Y < minY) minY = point.Y;
+                if (point.Y > maxY) maxY = point.Y;
+
+                BattlePositions.AddLast(point);
+            }
+
+            //一番左上の座標がbase座標になるよう移動
+            int baseX = 10 + 300 * (field - 1);
+            int baseY = 20;
+            int diffX = minX - baseX;
+            int diffY = minY - baseY;
+            LinkedList<ColorImagePoint> movedBattlePositions = new LinkedList<ColorImagePoint>();
+            foreach (ColorImagePoint point in BattlePositions)
+            {
+                ColorImagePoint movedPoint = new ColorImagePoint();
+                movedPoint.X = point.X - diffX;
+                movedPoint.Y = point.Y - diffY;
+                movedBattlePositions.AddLast(movedPoint);
+            }
+
+            //maxWidth, maxHeight内に収まるよう、スケールする
+            int maxWidth = 200;
+            int maxHeight = 180;
+            int width = maxX - minX;
+            int height = maxY - minY;
+            double ratioX = 1.0;
+            double ratioY = 1.0;
+
+            if (width > maxWidth) ratioX = (double)maxWidth / width;
+            if (height > maxHeight) ratioY = (double)maxHeight / height;
+
+            LinkedList<ColorImagePoint> scaledBattlePositions = new LinkedList<ColorImagePoint>();
+            if (ratioX == 1.0 && ratioY == 1.0)
+            {
+                scaledBattlePositions = movedBattlePositions;
+            }
+            else
+            {
+                foreach (ColorImagePoint point in movedBattlePositions)
+                {
+                    ColorImagePoint scaledPoint = new ColorImagePoint();
+                    scaledPoint.X = (int)((point.X - baseX) * ratioX) + baseX;
+                    scaledPoint.Y = (int)((point.Y - baseY) * ratioY) + baseY;
+                    scaledBattlePositions.AddLast(scaledPoint);
+                }
+            }
+
+            return scaledBattlePositions;
+           
         }
 
         /// <summary>
