@@ -26,6 +26,11 @@ namespace SkeletonTracking
         LinkedList<SkeletonPoint> PPositions2 = new LinkedList<SkeletonPoint>();//キャプチャしたプレイヤー2の右手のposition
         LinkedList<ColorImagePoint> BPositions1;
         LinkedList<ColorImagePoint> BPositions2;
+        bool is_player1_turn = true;
+        bool is_moving = false;
+        int move_type = 0;
+        int moving_count = 0;
+
         int player1_hp = 100; //player1用の体力 TODO intでいいのかな？
         int player2_hp = 100;
         bool t_flag = false;
@@ -648,7 +653,7 @@ namespace SkeletonTracking
             t_flag = true;
             //StopKinect(kinect);
             dispatcherTimer = new DispatcherTimer(DispatcherPriority.Normal);
-            dispatcherTimer.Interval = TimeSpan.FromMilliseconds(1000);
+            dispatcherTimer.Interval = TimeSpan.FromMilliseconds(10);
             
             BPositions1 = toBattlePosition(PPositions1, 1, kinect);
             BPositions2 = toBattlePosition(PPositions2, 2, kinect);
@@ -664,8 +669,84 @@ namespace SkeletonTracking
         }
         private void dispatcherTimer_Tick(object sender, EventArgs e)
         {
-            textblock1.Text = (player1_hp--).ToString();
+            if (!is_moving)
+            {
+                move_type = new System.Random().Next(3);
+                is_moving = true;
+            }
+            if (is_moving)
+            {
+                move();
+            }
 
+        }
+
+        private void move()
+        {
+            if (moving_count <= 50)
+            {
+                move_character(1, 0);
+            }
+            else if (moving_count <= 60)
+            {
+                int dy = (0 - ((moving_count - 50) / 2));
+                move_character(5, -dy*dy);
+            }
+            else if (moving_count <= 70)
+            {
+                int dy = (0 + ((moving_count - 60) / 2));
+                move_character(5, dy*dy);
+            }
+            else if (moving_count <= 120)
+            {
+                move_character(-3, 0);
+            }
+            else 
+            {
+                is_moving = false;
+                is_player1_turn = !is_player1_turn;
+                moving_count = 0;
+                return;
+            }
+
+            if (moving_count == 0) textblock1.Text = "1";
+            if (moving_count == 50) textblock1.Text = "2";
+            if (moving_count == 60) textblock1.Text = "3";
+            if (moving_count == 70) textblock1.Text = "4";
+            if (moving_count == 120) textblock1.Text = "5";
+
+            moving_count++;
+        }
+
+        private void move_character(int dx, int dy)
+        {
+            LinkedList<ColorImagePoint> newPosition = new LinkedList<ColorImagePoint>();
+            LinkedList<ColorImagePoint> rawPosition;
+            if (is_player1_turn)
+            {
+                rawPosition = BPositions1;
+            }
+            else
+            {
+                rawPosition = BPositions2;
+                dx = -dx;
+            }
+
+            foreach (ColorImagePoint point in rawPosition)
+            {
+                ColorImagePoint newPoint = new ColorImagePoint();
+                newPoint.X = point.X + dx;
+                newPoint.Y = point.Y + dy;
+                newPosition.AddLast(newPoint);
+            }
+            if (is_player1_turn)
+            {
+                BPositions1 = newPosition;
+            }
+            else
+            {
+                BPositions2 = newPosition;
+            }
         }
 
         private void DrawBattleCharacters()
@@ -706,7 +787,7 @@ namespace SkeletonTracking
             }
 
             //一番左上の座標がbase座標になるよう移動
-            int baseX = 10 + 300 * (field - 1);
+            int baseX = -40 + 300 * (field - 1);
             int baseY = 20;
             int diffX = minX - baseX;
             int diffY = minY - baseY;
@@ -720,31 +801,41 @@ namespace SkeletonTracking
             }
 
             //maxWidth, maxHeight内に収まるよう、スケールする
+            //また、センターによせる
             int maxWidth = 200;
             int maxHeight = 180;
             int width = maxX - minX;
             int height = maxY - minY;
             double ratioX = 1.0;
             double ratioY = 1.0;
+            int cx = 0;
+            int cy = 0;
 
-            if (width > maxWidth) ratioX = (double)maxWidth / width;
-            if (height > maxHeight) ratioY = (double)maxHeight / height;
-
-            LinkedList<ColorImagePoint> scaledBattlePositions = new LinkedList<ColorImagePoint>();
-            if (ratioX == 1.0 && ratioY == 1.0)
+            if (width > maxWidth)
             {
-                scaledBattlePositions = movedBattlePositions;
+                ratioX = (double)maxWidth / width;
             }
             else
             {
+                cx = (maxWidth - width) / 2;
+            }
+            if (height > maxHeight)
+            {
+                ratioY = (double)maxHeight / height;
+            }
+            else
+            {
+                cy = (maxHeight - height) / 2;
+            }
+
+            LinkedList<ColorImagePoint> scaledBattlePositions = new LinkedList<ColorImagePoint>();
                 foreach (ColorImagePoint point in movedBattlePositions)
                 {
                     ColorImagePoint scaledPoint = new ColorImagePoint();
-                    scaledPoint.X = (int)((point.X - baseX) * ratioX) + baseX;
-                    scaledPoint.Y = (int)((point.Y - baseY) * ratioY) + baseY;
+                    scaledPoint.X = (int)((point.X - baseX) * ratioX) + baseX + cx;
+                    scaledPoint.Y = (int)((point.Y - baseY) * ratioY) + baseY + cy;
                     scaledBattlePositions.AddLast(scaledPoint);
                 }
-            }
 
             return scaledBattlePositions;
            
