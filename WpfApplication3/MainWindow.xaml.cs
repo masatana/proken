@@ -28,6 +28,7 @@ namespace SkeletonTracking
         LinkedList<ColorImagePoint> BPositions2;
         bool is_player1_turn = true;
         bool is_moving = false;
+        int battle_finished = 0; // TODO 暫定的に，0ならまだバトル中，1ならplayerId = 1が勝利，2ならplayerId = 2が勝利
         int move_type = 0;
         int moving_count = 0;
 
@@ -294,10 +295,11 @@ namespace SkeletonTracking
                     // というかBattleStageに入るべきか
                     if (PPositions1.Count > 5 && PPositions2.Count > 5)
                     {
-                        //textblock1.Text = "100";
-                        //textblock2.Text = "100";
+                        //hp1.Text = "100";
+                        //hp2.Text = "100";
                         DrawBattleStage(kinect);
                         DrawBattleCharacters();
+                        if (battle_finished != 0) break; // TODO ゲーム終了処理
                         //tekitounaflag = true;
                         //return true;
                     }
@@ -651,26 +653,54 @@ namespace SkeletonTracking
                 return;
             }
             t_flag = true;
-            //StopKinect(kinect);
+            // ここでHP, ATK, DEFなどのテキスト表示．
+            hp1_text.Text = "HP"; atk1_text.Text = "ATK"; def1_text.Text = "DEF";
+            hp2_text.Text = "HP"; atk2_text.Text = "ATK"; def2_text.Text = "DEF";
+
+            // 初期パラメータ決定
+            setParameters(1); // playerId == 1
+            setParameters(2); // playerId == 2
+
             dispatcherTimer = new DispatcherTimer(DispatcherPriority.Normal);
             dispatcherTimer.Interval = TimeSpan.FromMilliseconds(10);
             
             BPositions1 = toBattlePosition(PPositions1, 1, kinect);
             BPositions2 = toBattlePosition(PPositions2, 2, kinect);
-            //StopKinect(kinect);
             dispatcherTimer.Tick += dispatcherTimer_Tick;
             dispatcherTimer.Start();
 
 
-            //textblock1.Text = (player1_hp--).ToString();
+            //hp1.Text = (player1_hp--).ToString();
             //System.Threading.Thread.Sleep(1000);
 
-            //TODO ダメージ表示処理など入れる
         }
+
+        private void setParameters(int playerId)
+        {
+            // TODO パラメータ適当すぎ
+            // 引数が一つなら，全てのparameterをランダムで選定
+            // seedはどうしようか．予定としてはPPositionにする予定
+            Random rnd = new Random();
+            if (playerId == 1)
+            {
+                hp1.Text = rnd.Next(90, 110).ToString();
+                atk1.Text = rnd.Next(90, 110).ToString();
+                def1.Text = rnd.Next(60, 80).ToString();
+            }
+            else
+            {
+                hp2.Text = rnd.Next(90, 110).ToString();
+                atk2.Text = rnd.Next(90, 110).ToString();
+                def2.Text = rnd.Next(60, 80).ToString();
+            }
+            
+        }
+
         private void dispatcherTimer_Tick(object sender, EventArgs e)
         {
             if (!is_moving)
             {
+                if (battle_finished != 0) return;
                 move_type = new System.Random().Next(3);
                 is_moving = true;
             }
@@ -696,26 +726,46 @@ namespace SkeletonTracking
             {
                 int dy = (0 + ((moving_count - 60) / 2));
                 move_character(5, dy*dy);
+                if (moving_count == 70) calculateDamage();
             }
             else if (moving_count <= 120)
             {
                 move_character(-3, 0);
             }
-            else 
+            else
             {
                 is_moving = false;
                 is_player1_turn = !is_player1_turn;
                 moving_count = 0;
                 return;
             }
-
-            if (moving_count == 0) textblock1.Text = "1";
-            if (moving_count == 50) textblock1.Text = "2";
-            if (moving_count == 60) textblock1.Text = "3";
-            if (moving_count == 70) textblock1.Text = "4";
-            if (moving_count == 120) textblock1.Text = "5";
-
+            /*
+            if (moving_count == 0) hp1.Text = "1";
+            if (moving_count == 50) hp1.Text = "2";
+            if (moving_count == 60) hp1.Text = "3";
+            if (moving_count == 70) hp1.Text = "4";
+            if (moving_count == 120) hp1.Text = "5";
+            */
             moving_count++;
+        }
+
+        private void calculateDamage()
+        {
+            if (is_player1_turn)
+            {
+                // playerId = 2を攻撃する
+                int player2_damage = int.Parse(atk1.Text) - int.Parse(def2.Text);
+                hp1.Text = (int.Parse(hp1.Text) - player2_damage).ToString();
+                if (int.Parse(hp2.Text) < 0) battle_finished = 2;
+
+            }
+            else
+            {
+                // playerId = 1を攻撃する
+                int player1_damage = int.Parse(atk2.Text) - int.Parse(def1.Text);
+                hp1.Text = (int.Parse(hp1.Text) - player1_damage).ToString();
+                if (int.Parse(hp1.Text) < 0) battle_finished = 1;
+            }
         }
 
         private void move_character(int dx, int dy)

@@ -13,7 +13,23 @@
         <ComboBox Height="24" HorizontalAlignment="Left" Name="comboBoxRange"
               VerticalAlignment="Top" Width="120"
               SelectionChanged="comboBoxRange_SelectionChanged" />
-        <TextBlock FontSize="100" Margin="10,200,300,0" Name="textblock1" Background="White"/>
-        <TextBlock FontSize="100" Margin="300,200,10,0" Name="textblock2" Background="White"/>
+        
+        <TextBlock FontSize="30" Margin="0,200,400,60" Name="hp1_text" Background="White"/>
+        <TextBlock FontSize="30" Margin="100,200,300,60" Name="hp1" Background="White"/>
+
+        <TextBlock FontSize="30" Margin="0,230,400,30" Name="atk1_text" Background="White"/>
+        <TextBlock FontSize="30" Margin="100,230,300,30" Name="atk1" Background="White"/>
+
+        <TextBlock FontSize="30" Margin="0,260,400,0" Name="def1_text" Background="White"/>
+        <TextBlock FontSize="30" Margin="100,260,300,0" Name="def1" Background="White"/>
+
+        <TextBlock FontSize="30" Margin="300,200,100,60" Name="hp2_text" Background="White"/>
+        <TextBlock FontSize="30" Margin="400,200,0,60" Name="hp2" Background="White"/>
+
+        <TextBlock FontSize="30" Margin="300,230,100,30" Name="atk2_text" Background="White"/>
+        <TextBlock FontSize="30" Margin="400,230,0,30" Name="atk2" Background="White"/>
+        
+        <TextBlock FontSize="30" Margin="300,260,100,0" Name="def2_text" Background="White"/>
+        <TextBlock FontSize="30" Margin="400,260,0,0" Name="def2" Background="White"/>
     </Grid>
 </Window>
