@@ -281,27 +281,13 @@ namespace SkeletonTracking
                             DrawEllipse(kinect, skeletonpoint, 1);
                         }
                     }
-
-                    /* 一時的にコメントアウト
-                    if (PPositions2.Count > 5)
-                    {
-                        foreach (SkeletonPoint skeletonpoint in PPositions2)
-                        {
-                            DrawEllipse(kinect, skeletonpoint, 2);
-                        }
-                    }
-                     * */
                     // ユーザaとユーザbがそれぞれ書き終わったら，ステータス表示
                     // というかBattleStageに入るべきか
                     if (PPositions1.Count > 5 && PPositions2.Count > 5)
                     {
-                        //hp1.Text = "100";
-                        //hp2.Text = "100";
                         DrawBattleStage(kinect);
                         DrawBattleCharacters();
-                        if (battle_finished != 0) break; // TODO ゲーム終了処理
-                        //tekitounaflag = true;
-                        //return true;
+                        // if (battle_finished != 0) break; // TODO ゲーム終了処理
                     }
                 }
             }
@@ -658,8 +644,8 @@ namespace SkeletonTracking
             hp2_text.Text = "HP"; atk2_text.Text = "ATK"; def2_text.Text = "DEF";
 
             // 初期パラメータ決定
-            setParameters(1); // playerId == 1
-            setParameters(2); // playerId == 2
+            setParameters(); // player1, player2ともに
+            
 
             dispatcherTimer = new DispatcherTimer(DispatcherPriority.Normal);
             dispatcherTimer.Interval = TimeSpan.FromMilliseconds(10);
@@ -669,30 +655,23 @@ namespace SkeletonTracking
             dispatcherTimer.Tick += dispatcherTimer_Tick;
             dispatcherTimer.Start();
 
-
-            //hp1.Text = (player1_hp--).ToString();
-            //System.Threading.Thread.Sleep(1000);
-
         }
 
-        private void setParameters(int playerId)
+        private void setParameters()
         {
             // TODO パラメータ適当すぎ
             // 引数が一つなら，全てのparameterをランダムで選定
             // seedはどうしようか．予定としてはPPositionにする予定
-            Random rnd = new Random();
-            if (playerId == 1)
-            {
-                hp1.Text = rnd.Next(90, 110).ToString();
-                atk1.Text = rnd.Next(90, 110).ToString();
-                def1.Text = rnd.Next(60, 80).ToString();
-            }
-            else
-            {
-                hp2.Text = rnd.Next(90, 110).ToString();
-                atk2.Text = rnd.Next(90, 110).ToString();
-                def2.Text = rnd.Next(60, 80).ToString();
-            }
+            Random rnd1 = new Random();
+            Random rnd2 = new Random();
+
+            hp1.Text = rnd1.Next(90, 110).ToString();
+            atk1.Text = rnd1.Next(90, 110).ToString();
+            def1.Text = rnd1.Next(60, 80).ToString();
+
+            hp2.Text = rnd2.Next(90, 110).ToString();
+            atk2.Text = rnd2.Next(90, 110).ToString();
+            def2.Text = rnd2.Next(60, 80).ToString();
             
         }
 
@@ -713,39 +692,56 @@ namespace SkeletonTracking
 
         private void move()
         {
-            if (moving_count <= 50)
+            if (battle_finished != 0) // battle_finished == 0の場合は戦闘が終了していない．戦闘が終了した場合
             {
-                move_character(1, 0);
-            }
-            else if (moving_count <= 60)
-            {
-                int dy = (0 - ((moving_count - 50) / 2));
-                move_character(5, -dy*dy);
-            }
-            else if (moving_count <= 70)
-            {
-                int dy = (0 + ((moving_count - 60) / 2));
-                move_character(5, dy*dy);
-                if (moving_count == 70) calculateDamage();
-            }
-            else if (moving_count <= 120)
-            {
-                move_character(-3, 0);
+                if (battle_finished == 1) is_player1_turn = false;
+                else is_player1_turn = true;
+                if (moving_count <= 60)
+                {
+                    int dy = (0 - ((moving_count - 60) / 2));
+                    move_character(0, dy);
+                }
+                else if (moving_count <= 120)
+                {
+                    int dy = (0 + ((moving_count - 60) / 2));
+                    move_character(0, -dy);
+                }
+                else
+                {
+                    moving_count = 0;
+                    return;
+                }
             }
             else
             {
-                is_moving = false;
-                is_player1_turn = !is_player1_turn;
-                moving_count = 0;
-                return;
+                if (moving_count <= 50)
+                {
+                    move_character(1, 0);
+                }
+                else if (moving_count <= 60)
+                {
+                    int dy = (0 - ((moving_count - 50) / 2));
+                    move_character(5, -dy * dy);
+                }
+                else if (moving_count <= 70)
+                {
+                    int dy = (0 + ((moving_count - 60) / 2));
+                    move_character(5, dy * dy);
+                    if (moving_count == 70) calculateDamage();
+                }
+                else if (moving_count <= 120)
+                {
+                    move_character(-3, 0);
+                }
+                else
+                {
+                    is_moving = false;
+                    is_player1_turn = !is_player1_turn;
+                    moving_count = 0;
+                    return;
+                }
             }
-            /*
-            if (moving_count == 0) hp1.Text = "1";
-            if (moving_count == 50) hp1.Text = "2";
-            if (moving_count == 60) hp1.Text = "3";
-            if (moving_count == 70) hp1.Text = "4";
-            if (moving_count == 120) hp1.Text = "5";
-            */
+
             moving_count++;
         }
 
@@ -755,7 +751,7 @@ namespace SkeletonTracking
             {
                 // playerId = 2を攻撃する
                 int player2_damage = int.Parse(atk1.Text) - int.Parse(def2.Text);
-                hp1.Text = (int.Parse(hp1.Text) - player2_damage).ToString();
+                hp2.Text = (int.Parse(hp2.Text) - player2_damage).ToString();
                 if (int.Parse(hp2.Text) < 0) battle_finished = 2;
 
             }
