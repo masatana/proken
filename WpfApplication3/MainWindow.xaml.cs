@@ -186,7 +186,6 @@ namespace SkeletonTracking
         /// <param name="e"></param>
         void kinect_SkeletonFrameReady(object sender, SkeletonFrameReadyEventArgs e)
         {
-            bool tekitounaflag = false;
             try
             {
                 // Kinectのインスタンスを取得する
@@ -644,7 +643,7 @@ namespace SkeletonTracking
             hp2_text.Text = "HP"; atk2_text.Text = "ATK"; def2_text.Text = "DEF";
 
             // 初期パラメータ決定
-            setParameters(); // player1, player2ともに
+            setParameters(kinect); // player1, player2ともに
             
 
             dispatcherTimer = new DispatcherTimer(DispatcherPriority.Normal);
@@ -657,13 +656,13 @@ namespace SkeletonTracking
 
         }
 
-        private void setParameters()
+        private void setParameters(KinectSensor kinect)
         {
             // TODO パラメータ適当すぎ
             // 引数が一つなら，全てのparameterをランダムで選定
             // seedはどうしようか．予定としてはPPositionにする予定
-            Random rnd1 = new Random();
-            Random rnd2 = new Random();
+            Random rnd1 = new Random(calculateSeed(1, kinect));
+            Random rnd2 = new Random(calculateSeed(1, kinect));
 
             hp1.Text = rnd1.Next(90, 110).ToString();
             atk1.Text = rnd1.Next(90, 110).ToString();
@@ -673,6 +672,29 @@ namespace SkeletonTracking
             atk2.Text = rnd2.Next(90, 110).ToString();
             def2.Text = rnd2.Next(60, 80).ToString();
             
+        }
+
+        private int calculateSeed(int playerId, KinectSensor kinect)
+        {
+            int seed = 0;
+            if (playerId == 1)
+            {
+                foreach (var position in PPositions1)
+                {
+                    ColorImagePoint point = kinect.MapSkeletonPointToColor(position, kinect.ColorStream.Format);
+                    seed += (int)point.X + (int)point.Y;
+                }
+                return seed;
+            }
+            else
+            {
+                foreach (var position in PPositions2)
+                {
+                    ColorImagePoint point = kinect.MapSkeletonPointToColor(position, kinect.ColorStream.Format);
+                    seed += (int)point.X + (int)point.Y;
+                }
+                return seed;
+            }
         }
 
         private void dispatcherTimer_Tick(object sender, EventArgs e)
